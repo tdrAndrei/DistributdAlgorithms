@@ -9,6 +9,7 @@ import uuid
 from ipv8.community import CommunitySettings
 from ipv8.messaging.payload_dataclass import dataclass
 from ipv8.types import Peer
+from numpy.matlib import empty
 
 from cs4545.system.da_types import DistributedAlgorithm, message_wrapper
 
@@ -102,6 +103,12 @@ class DolevAlgorithm(DistributedAlgorithm):
     @message_wrapper(SendMessage)
     async def on_message(self, peer: Peer, payload: SendMessage):
         self.received_last_msg_at = datetime.now()
+        if payload.id in self.delivered:
+            return
+        if payload.path.start ==self.node_id and payload.path.path_mask ==0:
+            print(f"Directly Delivered Source: {payload.path.start},Message: {payload.m}")
+            self.delivered[payload.id] = True
+            return
 
         newpath = payload.path.add(self.node_id_from_peer(peer))
         if payload.id not in self.paths:
@@ -113,10 +120,19 @@ class DolevAlgorithm(DistributedAlgorithm):
                 print(f"[Delivered] {payload.m}")
                 self.append_output(f"[Delivered] {payload.m}")
                 self.delivered[payload.id] = True
+                for n_id,p in self.nodes.items():
+                    empty_path=Path(payload.path.start)
+                    empty_msg=SendMessage(random_id(), payload.m, empty_path)
+                    self.ez_send(p, empty_msg)
+                return
 
         for n_id, p in self.nodes.items():
             if not newpath.contains(n_id):
-                msg = SendMessage(payload.id, payload.m, newpath)
+                if payload.id in self.delivered and self.delivered[payload.id]:
+                    empty_path=Path(payload.path.start)
+                    msg=SendMessage(random_id(), payload.m, empty_path)
+                else:
+                    msg = SendMessage(payload.id, payload.m, newpath)
                 self.ez_send(p, msg, self.max_delay)
 
     def ez_send(self, peer, msg, max_delay=0):
