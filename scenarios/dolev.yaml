@@ -1,4 +1,15 @@
 0:
-  type: dolev
+  type: "dolev"
   messages:
-    - "One message"
+    - "Message example 1"
+
+2:
+  type: "dolev_byzantine"
+  messages:
+    - "Malicious message"
+
+4:
+  type: "dolev"
+  messages:
+    - "Message example 2"
+    - "Message example 3"

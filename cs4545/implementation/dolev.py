@@ -1,6 +1,7 @@
 import asyncio
 import random
 import time
+from datetime import datetime
 import yaml
 import os
 import uuid
@@ -67,12 +68,15 @@ class DolevAlgorithm(DistributedAlgorithm):
         super().__init__(settings)
         self.delivered = {}
         self.f = int(os.environ["F"])
+        self.max_delay = int(os.environ["MAX_DELAY"])
         self.paths: dict[str, list["Path"]] = {}
         self.add_message_handler(SendMessage, self.on_message)
+        self.received_last_msg_at = None
 
     async def on_start(self):
         await super().on_start()
         print("I am dolev")
+        asyncio.create_task(self.is_finished())
         # read some instructions for your node
         #
         # if correct node then start broadcast
@@ -89,13 +93,16 @@ class DolevAlgorithm(DistributedAlgorithm):
     def broadcast(self, payload: str):
         msg = SendMessage(random_id(), payload, Path(self.node_id))
         for p in self.nodes.values():
-            self.ez_send(p, msg)
+            self.ez_send(p, msg, self.max_delay)
 
         self.delivered[msg.id] = True
         print(f"[Delivered] {payload}")
+        self.append_output(f"[Delivered] {payload} as source")
 
     @message_wrapper(SendMessage)
     async def on_message(self, peer: Peer, payload: SendMessage):
+        self.received_last_msg_at = datetime.now()
+
         newpath = payload.path.add(self.node_id_from_peer(peer))
         if payload.id not in self.paths:
             self.paths[payload.id] = []
@@ -104,19 +111,34 @@ class DolevAlgorithm(DistributedAlgorithm):
         if payload.id not in self.delivered:
             if Path.maximum_disjoint_set(self.paths[payload.id]) > self.f:
                 print(f"[Delivered] {payload.m}")
+                self.append_output(f"[Delivered] {payload.m}")
                 self.delivered[payload.id] = True
-                self.save_algorithm_output()
-                self.save_node_stats()
 
         for n_id, p in self.nodes.items():
             if not newpath.contains(n_id):
                 msg = SendMessage(payload.id, payload.m, newpath)
-                self.ez_send(p, msg)
+                self.ez_send(p, msg, self.max_delay)
 
-    def ez_send(self, peer, msg):
-        ms = random.random() * 200  # any time between 0 and 100 ms
+    def ez_send(self, peer, msg, max_delay=0):
+        ms = random.random() * max_delay
         time.sleep(ms / 1000.0)
         super().ez_send(peer, msg)
+
+    async def is_finished(self):
+        inactivity_threshold = 10  # In seconds
+
+        while True:
+            await asyncio.sleep(1)  # Check every second
+            if self.received_last_msg_at:
+                elapsed_time = (
+                    datetime.now() - self.received_last_msg_at
+                ).total_seconds()
+                if elapsed_time > inactivity_threshold:
+                    print(
+                        f"[Node {self.node_id}] Stopping due to inactivity. Last message received {elapsed_time:.2f} seconds ago."
+                    )
+                    self.stop()  # Stop the algorithm
+                    break
 
 
 class DolevByzantine(DolevAlgorithm):
@@ -129,4 +151,5 @@ class DolevByzantine(DolevAlgorithm):
 
     @message_wrapper(SendMessage)
     async def on_message(self, peer: Peer, payload: SendMessage):
+        self.received_last_msg_at = datetime.now()
         return

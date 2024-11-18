@@ -3,6 +3,7 @@ version: '3.7'
 x-common-variables: &common-variables
   TOPOLOGY: "topologies/dolev.yaml"
   INSTRUCTIONS: "scenarios/dolev.yaml"
+  MAX_DELAY: 200
   F: 1
   EMPTY: null # In case there are no listed common-variables
 
