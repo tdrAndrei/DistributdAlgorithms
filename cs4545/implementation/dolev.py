@@ -69,7 +69,6 @@ class DolevAlgorithm(DistributedAlgorithm):
         self.f = int(os.environ["F"])
         self.paths: dict[str, list["Path"]] = {}
         self.add_message_handler(SendMessage, self.on_message)
-        self.event
 
     async def on_start(self):
         await super().on_start()
@@ -112,7 +111,7 @@ class DolevAlgorithm(DistributedAlgorithm):
                 msg = SendMessage(payload.id, payload.m, newpath)
                 self.ez_send(p, msg)
 
-    def ez_send(peer, msg):
+    def ez_send(self, peer, msg):
         ms = random.random() * 200  # any time between 0 and 100 ms
         time.sleep(ms / 1000.0)
         super().ez_send(peer, msg)
