@@ -1,0 +1,10 @@
+0:
+  type: dolev
+  messages:
+    - "One message"
+    - "Second message"
+
+2:
+  type: dolev
+  messages:
+    - "some msg"

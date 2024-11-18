@@ -1,7 +1,9 @@
 version: '3.7'
 
 x-common-variables: &common-variables
-  TOPOLOGY: "topologies/ring.yaml"
+  TOPOLOGY: "topologies/dolev.yaml"
+  INSTRUCTIONS: "scenarios/dolev.yaml"
+  F: 1
   EMPTY: null # In case there are no listed common-variables
 
 services:
