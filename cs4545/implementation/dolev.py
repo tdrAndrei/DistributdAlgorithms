@@ -1,5 +1,6 @@
 import asyncio
 import random
+import time
 import yaml
 import os
 import uuid
@@ -68,8 +69,10 @@ class DolevAlgorithm(DistributedAlgorithm):
         self.f = int(os.environ["F"])
         self.paths: dict[str, list["Path"]] = {}
         self.add_message_handler(SendMessage, self.on_message)
+        self.event
 
     async def on_start(self):
+        await super().on_start()
         print("I am dolev")
         # read some instructions for your node
         #
@@ -109,14 +112,19 @@ class DolevAlgorithm(DistributedAlgorithm):
                 msg = SendMessage(payload.id, payload.m, newpath)
                 self.ez_send(p, msg)
 
+    def ez_send(peer, msg):
+        ms = random.random() * 200  # any time between 0 and 100 ms
+        time.sleep(ms / 1000.0)
+        super().ez_send(peer, msg)
+
 
 class DolevByzantine(DolevAlgorithm):
     def __init__(self, settings: CommunitySettings) -> None:
         super().__init__(settings)
 
     async def on_start(self):
-        print("I am dolev byzantine")
         await super().on_start()
+        print("I am dolev byzantine")
 
     @message_wrapper(SendMessage)
     async def on_message(self, peer: Peer, payload: SendMessage):
