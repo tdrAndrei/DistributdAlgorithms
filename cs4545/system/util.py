@@ -26,37 +26,35 @@ def prepare_compose_file(num_nodes, topology_file, algorithm, template_file, loc
 
         node = content['services']['node0']
         content['x-common-variables']['TOPOLOGY'] = topology_file
+        scenario = content["x-common-variables"]["INSTRUCTIONS"]
 
         nodes = {}
         baseport = 9090
-        connections = {}
 
         network_name = list(content['networks'].keys())[0]
         subnet = content['networks'][network_name]['ipam']['config'][0]['subnet'].split('/')[0]
         network_base = '.'.join(subnet.split('/')[0].split('.')[:-1])
 
-        # Create a ring topology
-        for i in range(num_nodes):
-            n = copy.deepcopy(node)
-            n['ports'] = [f'{baseport + i}:{baseport + i}']
-            n['networks'][network_name]['ipv4_address'] = f'{network_base}.{10 + i}'
-            n['environment']['PID'] = i
-            n['environment']['TOPOLOGY'] = topology_file
-            n['environment']['ALGORITHM'] = algorithm
-            n['environment']['LOCATION'] = location
-            nodes[f'node{i}'] = n
+        # Define necessary environment variables
+        with open(scenario, "r") as scenario_file:
+            instructions = yaml.safe_load(scenario_file)
 
-            connections[i] = [(i + 1) % num_nodes, (i - 1) % num_nodes]
+            for i in range(num_nodes):
+                n = copy.deepcopy(node)
+                myinstructions = instructions.get(i, {})
+                n["ports"] = [f"{baseport + i}:{baseport + i}"]
+                n["networks"][network_name]["ipv4_address"] = f"{network_base}.{10 + i}"
+                n["environment"]["PID"] = i
+                n["environment"]["TOPOLOGY"] = topology_file
+                n["environment"]["ALGORITHM"] = myinstructions.get("type", algorithm)
+                n["environment"]["LOCATION"] = location
+                nodes[f"node{i}"] = n
 
-        content['services'] = nodes
+            content["services"] = nodes
 
-        with open('docker-compose.yml', 'w') as f2:
-            yaml.safe_dump(content, f2)
-            print(f'Output written to docker-compose.yml')
-
-        with open(topology_file, 'w') as f3:
-            yaml.safe_dump(connections, f3)
-            print(f'Output written to {topology_file}')
+            with open("docker-compose.yml", "w") as f2:
+                yaml.safe_dump(content, f2)
+                print(f"Output written to docker-compose.yml")
 
 
 @cli.command('cfg')

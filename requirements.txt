@@ -6,3 +6,4 @@ pyyaml
 click
 networkx
 matplotlib
+aioconsole
