@@ -105,6 +105,8 @@ class DolevAlgorithm(DistributedAlgorithm):
             if Path.maximum_disjoint_set(self.paths[payload.id]) > self.f:
                 print(f"[Delivered] {payload.m}")
                 self.delivered[payload.id] = True
+                self.save_algorithm_output()
+                self.save_node_stats()
 
         for n_id, p in self.nodes.items():
             if not newpath.contains(n_id):
