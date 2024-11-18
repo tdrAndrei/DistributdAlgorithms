@@ -1,6 +1,7 @@
 import asyncio
 import random
 import time
+from collections import defaultdict
 from datetime import datetime
 import yaml
 import os
@@ -45,7 +46,7 @@ class Path:
         for index in range(0, len(paths)):
             subsets += [subset + [index] for subset in subsets]
         size = 0
-        for subset in subsets[1:]:
+        for subset in subsets:
             if Path.all_disjoint([paths[s] for s in subset]):
                 size = max(size, len(subset))
         return size
@@ -70,8 +71,8 @@ class DolevAlgorithm(DistributedAlgorithm):
         self.delivered = {}
         self.f = int(os.environ["F"])
         self.max_delay = int(os.environ["MAX_DELAY"])
-        self.paths: dict[str, list["Path"]] = {}
-        self.who_delivered: dict[str, list[int]] = {}
+        self.paths: dict[str, list["Path"]] = defaultdict(list)
+        self.who_delivered: dict[str, list[int]] = defaultdict(list)
         self.add_message_handler(SendMessage, self.on_message)
         self.received_last_msg_at = None
 
@@ -109,37 +110,24 @@ class DolevAlgorithm(DistributedAlgorithm):
 
         # MD.3
         if payload.path.path_mask == 0:
-            if payload.id not in self.who_delivered:
-                self.who_delivered[payload.id] = []
             self.who_delivered[payload.id].append(self.node_id_from_peer(peer))
             if payload.path.start == self.node_id_from_peer(peer):
-                print(
-                    f"Directly Delivered Source: {payload.path.start},Message: {payload.m}"
-                )
                 self.delivered[payload.id] = True
+            else:  # this is just an inform of delivery message
+                return
 
         newpath = payload.path.add(self.node_id_from_peer(peer))
-        if payload.id not in self.paths:
-            self.paths[payload.id] = []
         self.paths[payload.id].append(newpath)
 
         if payload.id not in self.delivered:
             if Path.maximum_disjoint_set(self.paths[payload.id]) > self.f:
-                print(f"[Delivered] {payload.m}")
-                self.append_output(f"[Delivered] {payload.m}")
                 self.delivered[payload.id] = True
 
         if payload.id in self.delivered:
             self.after_delivery(payload)
 
         for n_id, p in self.nodes.items():
-            if not newpath.contains(n_id) and n_id not in self.who_delivered.get(
-                payload.id, []
-            ):
-                # if payload.id in self.delivered and self.delivered[payload.id]:
-                #     empty_path=Path(payload.path.start)
-                #     msg=SendMessage(random_id(), payload.m, empty_path)
-                # else:
+            if not (newpath.contains(n_id) or n_id in self.who_delivered[payload.id]):
                 msg = SendMessage(payload.id, payload.m, newpath)
                 self.ez_send(p, msg, self.max_delay)
 
@@ -149,9 +137,11 @@ class DolevAlgorithm(DistributedAlgorithm):
         super().ez_send(peer, msg)
 
     def after_delivery(self, payload):
+        print(f"[Delivered] {payload.m}")
+        self.append_output(f"[Delivered] {payload.m}")
         for n_id, p in self.nodes.items():
             empty_path = Path(payload.path.start)
-            empty_msg = SendMessage(random_id(), payload.m, empty_path)
+            empty_msg = SendMessage(payload.id, payload.m, empty_path)
             self.ez_send(p, empty_msg)
         return
 
